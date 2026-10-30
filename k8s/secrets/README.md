@@ -26,7 +26,7 @@ kubectl create secret generic openrouter-secret \
 
 ## factory-pipeline-env (pipeline)
 
-Used by the phase-2 orchestrator CronJob and every per-ticket Job it spawns -- same values as `ai-software-factory`'s own local `.env`. `LITELLM_KEY` is the same value as `litellm-secret`'s `master_key` above; `LITELLM_BASE` can be left unset since the pipeline's in-cluster default already points at the `litellm` service in `ai-models`.
+Used by the phase-2 orchestrator CronJob and every per-ticket Job it spawns -- same values as `ai-software-factory`'s own local `.env`. `LITELLM_KEY` is the same value as `litellm-secret`'s `master_key` above; `LITELLM_BASE` can be left unset since the pipeline's in-cluster default already points at the `litellm` service in `ai-models`. `REVIEWER_GITHUB_TOKEN` is optional -- a fine-grained token from a *second* GitHub account (invited as a `factory-sample-app` collaborator with Write access), used only so the reviewer agent can submit a real GitHub review instead of a plain comment. Without it, the reviewer agent just posts a comment.
 
 ```sh
 kubectl create namespace pipeline --dry-run=client -o yaml | kubectl apply -f -
@@ -37,7 +37,8 @@ kubectl create secret generic factory-pipeline-env \
   --from-literal=JIRA_API_TOKEN="<jira api token>" \
   --from-literal=GITHUB_TOKEN="<github pat>" \
   --from-literal=GITHUB_REPO="egaraev/factory-sample-app" \
-  --from-literal=LITELLM_KEY="$LITELLM_KEY"
+  --from-literal=LITELLM_KEY="$LITELLM_KEY" \
+  --from-literal=REVIEWER_GITHUB_TOKEN="<second account's fine-grained PAT, or omit this line entirely>"
 ```
 
 ## Argo CD repo access (argocd)

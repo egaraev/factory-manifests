@@ -20,7 +20,7 @@ spec:
           containers:
             - name: orchestrator
               image: ghcr.io/egaraev/ai-software-factory:latest
-              command: ["python", "orchestrator.py", "KAN-10"]
+              command: ["python", "orchestrator.py", "KAN-24"]
               envFrom:
                 - secretRef:
                     name: factory-pipeline-env
