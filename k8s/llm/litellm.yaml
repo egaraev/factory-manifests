@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: litellm-config
+  namespace: ai-models
+data:
+  config.yaml: |
+    model_list:
+      - model_name: fx-cheap
+        litellm_params:
+          model: openai/hermes3-llama-3.1-8b
+          api_base: http://llama-swap.ai-models.svc.cluster.local:8080/v1
+          api_key: "none"
+          stream_timeout: 60
+      - model_name: fx-strong
+        litellm_params:
+          model: openai/qwen3.8-27b-Expert
+          api_base: http://llama-swap.ai-models.svc.cluster.local:8080/v1
+          api_key: "none"
+          stream_timeout: 60
+      - model_name: fx-code
+        litellm_params:
+          model: openai/qwen3.8-27b-Fast
+          api_base: http://llama-swap.ai-models.svc.cluster.local:8080/v1
+          api_key: "none"
+          stream_timeout: 60
+      - model_name: fx-code-hard
+        litellm_params:
+          model: openai/qwen3.8-27b-Expert
+          api_base: http://llama-swap.ai-models.svc.cluster.local:8080/v1
+          api_key: "none"
+          stream_timeout: 60
+      - model_name: fx-verify
+        litellm_params:
+          model: openrouter/google/gemini-3.8-flash
+          api_key: os.environ/OPENROUTER_API_KEY
+          cache_control_injection_points:
+            - location: message
+              role: system
+            - location: message
+              index: -1
+      - model_name: fx-review
+        litellm_params:
+          model: openrouter/anthropic/claude-opus-5
+          api_key: os.environ/OPENROUTER_API_KEY
+          cache_control_injection_points:
+            - location: message
+              role: system
+            - location: message
+              index: -1
+
+    general_settings:
+      master_key: os.environ/LITELLM_MASTER_KEY
+      allow_requests_on_db_unavailable: true
+
+    litellm_settings:
+      drop_params: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: litellm
+  namespace: ai-models
+  labels:
+    app: litellm
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: litellm
+  template:
+    metadata:
+      labels:
+        app: litellm
+    spec:
+      containers:
+        - name: litellm
+          image: ghcr.io/berriai/litellm:main-latest
+          args: ["--config", "/litellm-extra/config.yaml", "--port", "4000"]
+          ports:
+            - containerPort: 4000
+              name: http
+          env:
+            - name: LITELLM_MASTER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-secret
+                  key: master_key
+            - name: OPENROUTER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openrouter-secret
+                  key: OPENROUTER_API_KEY
+          volumeMounts:
+            - name: config
+              mountPath: /litellm-extra
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+      volumes:
+        - name: config
+          configMap:
+            name: litellm-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: litellm
+  namespace: ai-models
+spec:
+  selector:
+    app: litellm
+  ports:
+    - port: 4000
+      targetPort: 4000
+      name: http
