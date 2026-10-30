@@ -4,3 +4,10 @@ metadata:
   name: ai-models
   labels:
     app.kubernetes.io/part-of: ai-software-factory
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sample-app
+  labels:
+    app.kubernetes.io/part-of: ai-software-factory

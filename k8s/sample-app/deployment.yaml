@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: factory-sample-app
+  namespace: sample-app
+  labels:
+    app: factory-sample-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: factory-sample-app
+  template:
+    metadata:
+      labels:
+        app: factory-sample-app
+    spec:
+      containers:
+        - name: factory-sample-app
+          image: ghcr.io/egaraev/factory-sample-app:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+              name: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: factory-sample-app-nodeport
+  namespace: sample-app
+spec:
+  type: NodePort
+  selector:
+    app: factory-sample-app
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080
+      name: http
