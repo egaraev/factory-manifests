@@ -1,0 +1,289 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: router-dashboard-code
+  namespace: ai-models
+data:
+  dashboard.py: |
+    # read-only health/catalog view over litellm + llama-swap
+    # run: python3 dashboard.py, open http://<node>:30860
+
+    import json
+    import os
+    import urllib.request
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    import yaml
+
+    LITELLM_BASE = os.environ.get("LITELLM_BASE", "http://litellm.ai-models.svc.cluster.local:4000")
+    LITELLM_KEY = os.environ.get("LITELLM_KEY", "")
+    LLAMASWAP_BASE = os.environ.get("LLAMASWAP_BASE", "http://llama-swap.ai-models.svc.cluster.local:8080")
+    CONFIG_PATH = os.environ.get("CONFIG_PATH", "/litellm-extra/config.yaml")
+    DASH_PORT = int(os.environ.get("DASH_PORT", "8600"))
+
+
+    def _get_json(url, headers=None, timeout=2.0):
+        req = urllib.request.Request(url, headers=headers or {})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8", "replace"))
+
+
+    def classify(model_str, api_base):
+        m = (model_str or "").lower()
+        if api_base and "llama-swap" in api_base:
+            return "local", "llama-swap"
+        if m.startswith("openrouter/"):
+            return "cloud", "OpenRouter"
+        return "cloud", (m.split("/")[0] if "/" in m else "unknown")
+
+
+    def load_config():
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            return yaml.safe_load(f)
+
+
+    def load_models(cfg):
+        out = []
+        for entry in cfg.get("model_list", []):
+            name = entry.get("model_name")
+            lp = entry.get("litellm_params", {}) or {}
+            model = lp.get("model", "")
+            api_base = lp.get("api_base", "")
+            loc, prov = classify(model, api_base)
+            out.append({"name": name, "model": model, "location": loc, "provider": prov})
+        return out
+
+
+    def load_fallback_status(cfg):
+        fb = (cfg.get("litellm_settings", {}) or {}).get("fallbacks")
+        return {"enabled": bool(fb), "mapping": fb or []}
+
+
+    def gather():
+        data = {"litellm": {"ok": False}, "llamaswap": {"ok": False, "models": [], "running": []},
+                "models": [], "fallback": {"enabled": False, "mapping": []}}
+
+        try:
+            cfg = load_config()
+            data["models"] = load_models(cfg)
+            data["fallback"] = load_fallback_status(cfg)
+        except Exception as e:
+            data["config_error"] = str(e)
+
+        try:
+            _get_json(f"{LITELLM_BASE}/v1/models", headers={"Authorization": f"Bearer {LITELLM_KEY}"})
+            data["litellm"]["ok"] = True
+        except Exception as e:
+            data["litellm"]["error"] = str(e)
+
+        try:
+            j = _get_json(f"{LLAMASWAP_BASE}/v1/models")
+            data["llamaswap"]["models"] = [m.get("id") for m in j.get("data", [])]
+            data["llamaswap"]["ok"] = True
+        except Exception as e:
+            data["llamaswap"]["error"] = str(e)
+
+        # different llama-swap versions expose the running list under different paths
+        for path in ("/running", "/api/running"):
+            try:
+                j = _get_json(f"{LLAMASWAP_BASE}{path}")
+                running = j.get("running") or j.get("models") or j
+                if isinstance(running, list):
+                    data["llamaswap"]["running"] = [
+                        (x.get("model") if isinstance(x, dict) else x) for x in running
+                    ]
+                    break
+            except Exception:
+                continue
+
+        return data
+
+
+    PAGE = r"""<!doctype html><html><head><meta charset="utf-8">
+    <title>factory router dashboard</title>
+    <style>
+    :root{--bg:#0d1117;--card:#161b22;--line:#26303b;--txt:#e6edf3;--dim:#8b949e;
+    --local:#3fb950;--cloud:#58a6ff;--off:#f85149;}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);
+    font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;padding:24px}
+    h1{font-size:18px;margin:0 0 2px}.sub{color:var(--dim);margin-bottom:18px}
+    .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+    .up{background:var(--local)}.down{background:var(--off)}
+    .hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+    .btn{background:#21262d;border:1px solid var(--line);color:var(--txt);border-radius:6px;
+    padding:6px 12px;cursor:pointer;font-size:13px}.btn:hover{border-color:#3d444d}
+    .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:18px}
+    @media(max-width:700px){.cards{grid-template-columns:1fr}}
+    .stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+    .stat .n{font-size:15px;font-weight:700}.stat .l{color:var(--dim);font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+    .card h2{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--dim);
+    margin:0 0 12px;font-weight:600}
+    table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:7px 8px;
+    border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
+    th{color:var(--dim);font-weight:500;font-size:12px}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+    .tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:20px;border:1px solid var(--line)}
+    .t-local{color:var(--local);border-color:#1c3b25}.t-cloud{color:var(--cloud);border-color:#1c3350}
+    .small{color:var(--dim);font-size:12px}
+    </style></head><body>
+    <div class="hdr"><div>
+    <h1>factory router dashboard</h1>
+    <div class="sub" id="sub">loading…</div></div>
+    <button class="btn" onclick="load()">↻ Refresh</button></div>
+
+    <div class="cards" id="health"></div>
+
+    <div class="card"><h2>cloud auto-fallback <span id="fb-h"></span></h2>
+      <div id="fb-body"></div>
+    </div>
+
+    <div class="grid">
+      <div class="card"><h2>litellm model_list (:4000)</h2>
+        <table><thead><tr><th>Name</th><th>Location</th><th>Underlying model</th></tr></thead>
+        <tbody id="models"></tbody></table>
+      </div>
+      <div class="card"><h2>llama-swap models (:8080)</h2>
+        <table><thead><tr><th>Model</th><th>State</th></tr></thead>
+        <tbody id="ls"></tbody></table>
+      </div>
+    </div>
+
+    <script>
+    function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+    function hdot(ok){return '<span class="dot '+(ok?'up':'down')+'"></span>'+(ok?'online':'offline');}
+
+    async function load(){
+      let m;
+      try{ m = await (await fetch('/api/models')).json(); }
+      catch(e){ document.getElementById('sub').textContent='dashboard error: '+e; return; }
+
+      document.getElementById('health').innerHTML = [
+        ['litellm :4000', m.litellm.ok], ['llama-swap :8080', m.llamaswap.ok]
+      ].map(([l,ok])=>'<div class="stat"><div class="n">'+hdot(ok)+'</div><div class="l">'+l+'</div></div>').join('');
+
+      document.getElementById('fb-h').innerHTML = m.fallback.enabled
+        ? '<span class="tag t-cloud">on</span>' : '<span class="tag" style="color:var(--dim)">off</span>';
+      document.getElementById('fb-body').innerHTML = m.fallback.enabled
+        ? '<table><tbody>'+m.fallback.mapping.map(row=>Object.entries(row).map(([k,v])=>
+            '<tr><td class="mono">'+esc(k)+'</td><td>→</td><td class="mono">'+esc((v||[]).join(', '))+'</td></tr>').join('')).join('')+'</tbody></table>'
+        : '<div class="small">disabled — a failing model does not silently fall back to cloud</div>';
+
+      document.getElementById('models').innerHTML = (m.models||[]).map(r=>
+        '<tr><td class="mono">'+esc(r.name)+'</td>'
+        +'<td><span class="tag '+(r.location==='local'?'t-local':'t-cloud')+'">'+esc(r.location)+'</span> <span class="small">'+esc(r.provider)+'</span></td>'
+        +'<td class="mono small">'+esc(r.model)+'</td></tr>').join('');
+
+      const running = new Set(m.llamaswap.running||[]);
+      document.getElementById('ls').innerHTML = (m.llamaswap.models||[]).length
+        ? m.llamaswap.models.map(mm=>'<tr><td class="mono">'+esc(mm)+'</td><td>'+
+            (running.has(mm)?'<span class="dot up"></span>running':'<span class="small">idle</span>')+'</td></tr>').join('')
+        : '<tr><td colspan="2" class="small">'+(m.llamaswap.error?('offline — '+esc(m.llamaswap.error)):'no models reported')+'</td></tr>';
+
+      document.getElementById('sub').textContent =
+        (m.models||[]).length+' models configured · updated '+new Date().toLocaleTimeString();
+    }
+    load(); setInterval(load, 8000);
+    </script></body></html>"""
+
+
+    class Handler(BaseHTTPRequestHandler):
+        def _send(self, code, body, ctype="text/html; charset=utf-8"):
+            b = body.encode("utf-8") if isinstance(body, str) else body
+            self.send_response(code)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(b)))
+            self.end_headers()
+            self.wfile.write(b)
+
+        def do_GET(self):
+            if self.path.startswith("/api/models"):
+                self._send(200, json.dumps(gather()), "application/json")
+            elif self.path in ("/", "/index.html"):
+                self._send(200, PAGE)
+            else:
+                self._send(404, "not found", "text/plain")
+
+        def log_message(self, *a):  # quiet
+            pass
+
+
+    def main():
+        print(f"[router-dashboard] http://0.0.0.0:{DASH_PORT} (litellm={LITELLM_BASE}, llama-swap={LLAMASWAP_BASE})")
+        ThreadingHTTPServer(("0.0.0.0", DASH_PORT), Handler).serve_forever()
+
+
+    if __name__ == "__main__":
+        main()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: router-dashboard
+  namespace: ai-models
+  labels:
+    app: router-dashboard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: router-dashboard
+  template:
+    metadata:
+      labels:
+        app: router-dashboard
+    spec:
+      containers:
+        - name: router-dashboard
+          image: python:3.13-slim
+          command: ["sh", "-c"]
+          args:
+            - |
+              pip install --no-cache-dir --break-system-packages pyyaml
+              exec python3 /app/dashboard.py
+          ports:
+            - containerPort: 8600
+              name: http
+          env:
+            - name: LITELLM_BASE
+              value: "http://litellm.ai-models.svc.cluster.local:4000"
+            - name: LLAMASWAP_BASE
+              value: "http://llama-swap.ai-models.svc.cluster.local:8080"
+            - name: CONFIG_PATH
+              value: "/litellm-extra/config.yaml"
+            - name: LITELLM_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: litellm-secret
+                  key: master_key
+          volumeMounts:
+            - name: dashboard-code
+              mountPath: /app
+              readOnly: true
+            - name: litellm-config
+              mountPath: /litellm-extra
+              readOnly: true
+      volumes:
+        - name: dashboard-code
+          configMap:
+            name: router-dashboard-code
+        - name: litellm-config
+          configMap:
+            name: litellm-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: router-dashboard
+  namespace: ai-models
+spec:
+  type: NodePort
+  selector:
+    app: router-dashboard
+  ports:
+    - port: 8600
+      targetPort: 8600
+      nodePort: 30860
+      name: http
