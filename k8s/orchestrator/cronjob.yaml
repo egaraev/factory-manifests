@@ -15,6 +15,8 @@ spec:
         spec:
           serviceAccountName: factory-orchestrator
           restartPolicy: Never
+          imagePullSecrets:
+            - name: ghcr-pull-secret  # ai-software-factory's GHCR package is private
           containers:
             - name: orchestrator
               image: ghcr.io/egaraev/ai-software-factory:latest
