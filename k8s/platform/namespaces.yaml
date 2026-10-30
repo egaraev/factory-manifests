@@ -11,3 +11,10 @@ metadata:
   name: sample-app
   labels:
     app.kubernetes.io/part-of: ai-software-factory
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pipeline
+  labels:
+    app.kubernetes.io/part-of: ai-software-factory

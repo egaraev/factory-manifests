@@ -24,6 +24,22 @@ kubectl create secret generic openrouter-secret \
   --from-literal=OPENROUTER_API_KEY="$OPENROUTER_KEY"
 ```
 
+## factory-pipeline-env (pipeline)
+
+Used by the phase-2 orchestrator CronJob and every per-ticket Job it spawns -- same values as `ai-software-factory`'s own local `.env`. `LITELLM_KEY` is the same value as `litellm-secret`'s `master_key` above; `LITELLM_BASE` can be left unset since the pipeline's in-cluster default already points at the `litellm` service in `ai-models`.
+
+```sh
+kubectl create namespace pipeline --dry-run=client -o yaml | kubectl apply -f -
+kubectl create secret generic factory-pipeline-env \
+  --namespace pipeline \
+  --from-literal=JIRA_URL="https://egaraev.atlassian.net" \
+  --from-literal=JIRA_EMAIL="<your jira email>" \
+  --from-literal=JIRA_API_TOKEN="<jira api token>" \
+  --from-literal=GITHUB_TOKEN="<github pat>" \
+  --from-literal=GITHUB_REPO="egaraev/factory-sample-app" \
+  --from-literal=LITELLM_KEY="$LITELLM_KEY"
+```
+
 ## Argo CD repo access (argocd)
 
 ```sh
