@@ -54,22 +54,3 @@ data:
         env:
           - "CUDA_VISIBLE_DEVICES=GPU-832b5f69-26d2-3908-7838-831fc0b98a17"
         ttl: 300
-
-      hermes3-llama-3.1-8b:
-        cmd: |
-          llama-server
-          -m /models/hermes3-llama-3.1-8B/Hermes-3-Llama-3.1-8B.Q4_K_M.gguf
-          --port ${PORT}
-          --host 0.0.0.0
-          --n-gpu-layers 99
-          -t 8
-          --load-mode none
-          --parallel 1
-          --flash-attn on
-          --jinja
-          -ctk q8_0
-          -ctv q8_0
-          -c 65536
-        env:
-          - "CUDA_VISIBLE_DEVICES=GPU-832b5f69-26d2-3908-7838-831fc0b98a17"
-        ttl: 60

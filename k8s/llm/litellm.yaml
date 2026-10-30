@@ -8,7 +8,7 @@ data:
     model_list:
       - model_name: fx-cheap
         litellm_params:
-          model: openai/hermes3-llama-3.1-8b
+          model: openai/qwen3.8-27b-Fast
           api_base: http://llama-swap.ai-models.svc.cluster.local:8080/v1
           api_key: "none"
           stream_timeout: 60
@@ -32,7 +32,7 @@ data:
           stream_timeout: 60
       - model_name: fx-verify
         litellm_params:
-          model: openrouter/google/gemini-3.8-flash
+          model: openrouter/deepseek/deepseek-v3.2
           api_key: os.environ/OPENROUTER_API_KEY
           cache_control_injection_points:
             - location: message
@@ -41,7 +41,7 @@ data:
               index: -1
       - model_name: fx-review
         litellm_params:
-          model: openrouter/anthropic/claude-opus-5
+          model: openrouter/anthropic/claude-sonnet-5
           api_key: os.environ/OPENROUTER_API_KEY
           cache_control_injection_points:
             - location: message
