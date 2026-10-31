@@ -1,0 +1,46 @@
+# receives alertmanager's webhook posts (see k8s/observe/alertmanager.yaml) and
+# turns each firing alert into an unassigned "ops"-labeled jira ticket. always-on,
+# not a job -- reuses the same image/secret the orchestrator cronjob uses, just a
+# different entrypoint
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-webhook
+  namespace: pipeline
+  labels:
+    app: alert-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: alert-webhook}
+  template:
+    metadata:
+      labels: {app: alert-webhook}
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: alert-webhook
+          image: ghcr.io/egaraev/ai-software-factory:latest
+          command: ["python", "alert_webhook.py"]
+          ports:
+            - containerPort: 8000
+              name: http
+          envFrom:
+            - secretRef:
+                name: factory-pipeline-env
+          resources:
+            requests: {cpu: "25m", memory: "64Mi"}
+            limits: {cpu: "200m", memory: "256Mi"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alert-webhook
+  namespace: pipeline
+spec:
+  selector: {app: alert-webhook}
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http

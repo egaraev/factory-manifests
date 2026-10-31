@@ -1,0 +1,132 @@
+# read-only access to the 4 namespaces this whole factory owns -- no write/delete
+# anywhere, and nothing at all in argocd/kube-system/platform. sre_agent.py runs
+# under this to read pod status/events directly (prometheus/loki cover metrics/logs,
+# this is for the stuff that only ever shows up as a k8s Event, e.g. OOMKilled)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sre-agent
+  namespace: pipeline
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sre-agent-read
+  namespace: ai-models
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "events", "services", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sre-agent-read
+  namespace: ai-models
+subjects:
+  - kind: ServiceAccount
+    name: sre-agent
+    namespace: pipeline
+roleRef:
+  kind: Role
+  name: sre-agent-read
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sre-agent-read
+  namespace: pipeline
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "events", "services", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sre-agent-read
+  namespace: pipeline
+subjects:
+  - kind: ServiceAccount
+    name: sre-agent
+    namespace: pipeline
+roleRef:
+  kind: Role
+  name: sre-agent-read
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sre-agent-read
+  namespace: sample-app
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "events", "services", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sre-agent-read
+  namespace: sample-app
+subjects:
+  - kind: ServiceAccount
+    name: sre-agent
+    namespace: pipeline
+roleRef:
+  kind: Role
+  name: sre-agent-read
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sre-agent-read
+  namespace: observe
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "events", "services", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sre-agent-read
+  namespace: observe
+subjects:
+  - kind: ServiceAccount
+    name: sre-agent
+    namespace: pipeline
+roleRef:
+  kind: Role
+  name: sre-agent-read
+  apiGroup: rbac.authorization.k8s.io

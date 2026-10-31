@@ -45,6 +45,14 @@ data:
       scrape_interval: 30s
       evaluation_interval: 30s
 
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: ["alertmanager.observe.svc.cluster.local:9093"]
+
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+
     scrape_configs:
       - job_name: prometheus
         static_configs:
@@ -127,6 +135,51 @@ data:
             action: replace
             target_label: pod
 ---
+# homelab-scale alerting rules -- crash loops, scrape targets going down, pods
+# stuck non-Running, and node memory pressure. alertmanager.yaml routes these to
+# alert-webhook, which turns each firing one into an "ops" jira ticket
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: observe
+data:
+  factory-alerts.yml: |
+    groups:
+      - name: factory-alerts
+        rules:
+          - alert: PodCrashLooping
+            expr: increase(kube_pod_container_status_restarts_total[15m]) > 3
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $labels.namespace }}/{{ $labels.pod }} is crash-looping ({{ $value }} restarts in 15m)"
+
+          - alert: TargetDown
+            expr: up == 0
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "scrape target {{ $labels.job }} ({{ $labels.instance }}) is down"
+
+          - alert: PodNotReady
+            expr: kube_pod_status_phase{phase=~"Pending|Failed"} == 1
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "{{ $labels.namespace }}/{{ $labels.pod }} stuck in {{ $labels.phase }}"
+
+          - alert: NodeMemoryPressure
+            expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.9
+            for: 10m
+            labels:
+              severity: warning
+            annotations:
+              summary: "node memory usage above 90%"
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -172,6 +225,8 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/prometheus
+            - name: rules
+              mountPath: /etc/prometheus/rules
             - name: data
               mountPath: /prometheus
             - name: litellm-token
@@ -188,6 +243,9 @@ spec:
         - name: config
           configMap:
             name: prometheus-config
+        - name: rules
+          configMap:
+            name: prometheus-rules
         - name: data
           persistentVolumeClaim:
             claimName: prometheus-data

@@ -1,0 +1,72 @@
+# routes prometheus's alerting rules (see prometheus.yaml's rule_files) to
+# alert-webhook, which turns each firing alert into a jira ticket. 1h repeat --
+# alert-webhook dedupes by summary anyway, this just caps how often a still-firing
+# alert re-notifies it
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-config
+  namespace: observe
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+
+    route:
+      receiver: webhook
+      group_by: ["alertname", "namespace"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 1h
+
+    receivers:
+      - name: webhook
+        webhook_configs:
+          - url: http://alert-webhook.pipeline.svc.cluster.local:8000/
+            send_resolved: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager
+  namespace: observe
+  labels:
+    app: alertmanager
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: alertmanager}
+  template:
+    metadata:
+      labels: {app: alertmanager}
+    spec:
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.34.0
+          args:
+            - --config.file=/etc/alertmanager/alertmanager.yml
+          ports:
+            - containerPort: 9093
+              name: http
+          volumeMounts:
+            - name: config
+              mountPath: /etc/alertmanager
+          resources:
+            requests: {cpu: "25m", memory: "64Mi"}
+            limits: {cpu: "200m", memory: "256Mi"}
+      volumes:
+        - name: config
+          configMap:
+            name: alertmanager-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+  namespace: observe
+spec:
+  selector: {app: alertmanager}
+  ports:
+    - port: 9093
+      targetPort: 9093
+      name: http
