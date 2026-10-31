@@ -111,6 +111,8 @@ spec:
       containers:
         - name: kube-state-metrics
           image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.19.1
+          args:
+            - --resources=pods,services,deployments,nodes,namespaces,replicasets,daemonsets,statefulsets,jobs,cronjobs,persistentvolumeclaims,persistentvolumes,horizontalpodautoscalers
           ports:
             - containerPort: 8080
               name: http-metrics
