@@ -24,7 +24,6 @@ rules:
       - pods
       - replicationcontrollers
       - resourcequotas
-      - secrets
       - services
     verbs: ["list", "watch"]
   - apiGroups: ["apps"]
@@ -63,13 +62,6 @@ rules:
   - apiGroups: ["policy"]
     resources:
       - poddisruptionbudgets
-    verbs: ["list", "watch"]
-  - apiGroups: ["rbac.authorization.k8s.io"]
-    resources:
-      - clusterrolebindings
-      - clusterroles
-      - rolebindings
-      - roles
     verbs: ["list", "watch"]
   - apiGroups: ["storage.k8s.io"]
     resources:
