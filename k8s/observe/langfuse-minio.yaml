@@ -1,0 +1,129 @@
+# s3-compatible blob store for langfuse's event/media uploads. uses chainguard's
+# mirror -- docker hub dropped minio's images and quay.io later gated anonymous
+# pulls of them too, chainguard still allows anonymous pulls of the same binaries.
+# its minio-client image has no /bin/sh, so the bucket-creation job below uses
+# MC_HOST_<alias> (mc's own env-var alias mechanism) instead of a shell script
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: langfuse-minio-data
+  namespace: observe
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-minio
+  namespace: observe
+  labels:
+    app: langfuse-minio
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: langfuse-minio
+  template:
+    metadata:
+      labels:
+        app: langfuse-minio
+    spec:
+      containers:
+        - name: minio
+          image: cgr.dev/chainguard/minio:latest
+          args: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - containerPort: 9000
+              name: api
+            - containerPort: 9001
+              name: console
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_PASSWORD
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: langfuse-minio-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-minio
+  namespace: observe
+spec:
+  selector:
+    app: langfuse-minio
+  ports:
+    - port: 9000
+      targetPort: 9000
+      name: api
+    - port: 9001
+      targetPort: 9001
+      name: console
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: langfuse-minio-create-buckets
+  namespace: observe
+spec:
+  activeDeadlineSeconds: 120
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc-events
+          image: cgr.dev/chainguard/minio-client:latest
+          args: ["mb", "--ignore-existing", "langfuseminio/langfuse-events"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_PASSWORD
+            - name: MC_HOST_langfuseminio
+              value: "http://$(MINIO_ROOT_USER):$(MINIO_ROOT_PASSWORD)@langfuse-minio.observe.svc.cluster.local:9000"
+        - name: mc-media
+          image: cgr.dev/chainguard/minio-client:latest
+          args: ["mb", "--ignore-existing", "langfuseminio/langfuse-media"]
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_PASSWORD
+            - name: MC_HOST_langfuseminio
+              value: "http://$(MINIO_ROOT_USER):$(MINIO_ROOT_PASSWORD)@langfuse-minio.observe.svc.cluster.local:9000"

@@ -34,27 +34,22 @@ data:
         litellm_params:
           model: openrouter/deepseek/deepseek-v3.2
           api_key: os.environ/OPENROUTER_API_KEY
-          cache_control_injection_points:
-            - location: message
-              role: system
-            - location: message
-              index: -1
+          cache_control_injection_points: [...]
       - model_name: fx-review
         litellm_params:
           model: openrouter/anthropic/claude-sonnet-5
           api_key: os.environ/OPENROUTER_API_KEY
-          cache_control_injection_points:
-            - location: message
-              role: system
-            - location: message
-              index: -1
+          cache_control_injection_points: [...]
 
     general_settings:
       master_key: os.environ/LITELLM_MASTER_KEY
       allow_requests_on_db_unavailable: true
+      require_auth_for_metrics_endpoint: false  # prometheus scrapes /metrics with no auth header
 
     litellm_settings:
       drop_params: true
+      callbacks: ["prometheus"]  # exposes /metrics, scraped via the pod annotation below
+      success_callback: ["langfuse"]  # traces every call -- see k8s/observe/langfuse.yaml
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -68,55 +63,45 @@ spec:
   strategy:
     type: Recreate
   selector:
-    matchLabels:
-      app: litellm
+    matchLabels: {app: litellm}
   template:
     metadata:
-      labels:
-        app: litellm
+      labels: {app: litellm}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4000"
     spec:
       containers:
         - name: litellm
           image: ghcr.io/berriai/litellm:main-latest
           args: ["--config", "/litellm-extra/config.yaml", "--port", "4000"]
-          ports:
-            - containerPort: 4000
-              name: http
+          ports: [{containerPort: 4000, name: http}]
           env:
             - name: LITELLM_MASTER_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: litellm-secret
-                  key: master_key
+              valueFrom: {secretKeyRef: {name: litellm-secret, key: master_key}}
             - name: OPENROUTER_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: openrouter-secret
-                  key: OPENROUTER_API_KEY
-          volumeMounts:
-            - name: config
-              mountPath: /litellm-extra
+              valueFrom: {secretKeyRef: {name: openrouter-secret, key: OPENROUTER_API_KEY}}
+            # langfuse project keys don't exist until a human creates a project in its UI
+            # (see secrets/README.md) -- optional:true means litellm starts fine without
+            # them, tracing just silently no-ops until the secret's filled in and this
+            # pod restarts
+            - name: LANGFUSE_PUBLIC_KEY
+              valueFrom: {secretKeyRef: {name: langfuse-litellm-secret, key: LANGFUSE_PUBLIC_KEY, optional: true}}
+            - name: LANGFUSE_SECRET_KEY
+              valueFrom: {secretKeyRef: {name: langfuse-litellm-secret, key: LANGFUSE_SECRET_KEY, optional: true}}
+            - name: LANGFUSE_HOST
+              value: "http://langfuse-web.observe.svc.cluster.local:3000"
+          volumeMounts: [{name: config, mountPath: /litellm-extra}]
           resources:
-            requests:
-              cpu: "250m"
-              memory: "512Mi"
-            limits:
-              cpu: "1"
-              memory: "1Gi"
+            requests: {cpu: "250m", memory: "512Mi"}
+            limits: {cpu: "1", memory: "1Gi"}
       volumes:
         - name: config
-          configMap:
-            name: litellm-config
+          configMap: {name: litellm-config}
 ---
 apiVersion: v1
 kind: Service
-metadata:
-  name: litellm
-  namespace: ai-models
+metadata: {name: litellm, namespace: ai-models}
 spec:
-  selector:
-    app: litellm
-  ports:
-    - port: 4000
-      targetPort: 4000
-      name: http
+  selector: {app: litellm}
+  ports: [{port: 4000, targetPort: 4000, name: http}]

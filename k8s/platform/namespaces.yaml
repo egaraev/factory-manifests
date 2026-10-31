@@ -18,3 +18,10 @@ metadata:
   name: pipeline
   labels:
     app.kubernetes.io/part-of: ai-software-factory
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observe
+  labels:
+    app.kubernetes.io/part-of: ai-software-factory

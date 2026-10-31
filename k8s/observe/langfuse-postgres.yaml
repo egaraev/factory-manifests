@@ -1,0 +1,76 @@
+# dedicated to langfuse -- nothing else on this cluster needs postgres, so this
+# is a fresh single-db instance rather than a shared one
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: langfuse-postgres-data
+  namespace: observe
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-postgres
+  namespace: observe
+  labels:
+    app: langfuse-postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: langfuse-postgres
+  template:
+    metadata:
+      labels:
+        app: langfuse-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_USER
+              value: langfuse
+            - name: POSTGRES_DB
+              value: langfuse
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-postgres-secret
+                  key: password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "1Gi"
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: langfuse-postgres-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-postgres
+  namespace: observe
+spec:
+  selector:
+    app: langfuse-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+      name: postgres

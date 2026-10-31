@@ -1,0 +1,244 @@
+# self-hosted llm tracing -- langfuse-web (ui+api, :3000) and langfuse-worker
+# (async event processor, :3030), both talking to the same postgres/clickhouse/
+# redis/minio. litellm is wired to send traces here via success_callback:[langfuse]
+# in k8s/llm/litellm.yaml, once its LANGFUSE_PUBLIC_KEY/SECRET_KEY secret is filled
+# in from a project created in the langfuse UI after first login (see secrets/README.md)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-web
+  namespace: observe
+  labels:
+    app: langfuse-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse-web
+  template:
+    metadata:
+      labels:
+        app: langfuse-web
+    spec:
+      containers:
+        - name: langfuse-web
+          image: langfuse/langfuse:3
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=2560"  # caps v8's heap below the container limit
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-postgres-secret
+                  key: DATABASE_URL
+            - name: CLICKHOUSE_CLUSTER_ENABLED
+              value: "false"  # single-node clickhouse, not a replicated cluster
+            - name: CLICKHOUSE_URL
+              value: "http://langfuse-clickhouse.observe.svc.cluster.local:8123"
+            - name: CLICKHOUSE_MIGRATION_URL
+              value: "clickhouse://langfuse-clickhouse.observe.svc.cluster.local:9000"
+            - name: CLICKHOUSE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-clickhouse-secret
+                  key: CLICKHOUSE_USER
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-clickhouse-secret
+                  key: CLICKHOUSE_PASSWORD
+            - name: REDIS_CONNECTION_STRING
+              value: "redis://langfuse-redis.observe.svc.cluster.local:6379"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+              value: "langfuse-events"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
+              value: "auto"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+              value: "http://langfuse-minio.observe.svc.cluster.local:9000"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+              value: "true"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_USER
+            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_PASSWORD
+            - name: LANGFUSE_S3_MEDIA_UPLOAD_BUCKET
+              value: "langfuse-media"
+            - name: LANGFUSE_S3_MEDIA_UPLOAD_REGION
+              value: "auto"
+            - name: LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT
+              value: "http://langfuse-minio.observe.svc.cluster.local:9000"
+            - name: LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE
+              value: "true"
+            - name: LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_USER
+            - name: LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_PASSWORD
+            - name: NEXTAUTH_URL
+              value: "http://localhost:30350"
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-secret
+                  key: NEXTAUTH_SECRET
+            - name: SALT
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-secret
+                  key: SALT
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-secret
+                  key: ENCRYPTION_KEY
+            - name: TELEMETRY_ENABLED
+              value: "false"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "3Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-web
+  namespace: observe
+spec:
+  type: NodePort
+  selector:
+    app: langfuse-web
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30350
+      name: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-worker
+  namespace: observe
+  labels:
+    app: langfuse-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse-worker
+  template:
+    metadata:
+      labels:
+        app: langfuse-worker
+    spec:
+      containers:
+        - name: langfuse-worker
+          image: langfuse/langfuse-worker:3
+          ports:
+            - containerPort: 3030
+              name: http
+          env:
+            - name: NODE_OPTIONS
+              value: "--max-old-space-size=2560"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-postgres-secret
+                  key: DATABASE_URL
+            - name: CLICKHOUSE_CLUSTER_ENABLED
+              value: "false"
+            - name: CLICKHOUSE_URL
+              value: "http://langfuse-clickhouse.observe.svc.cluster.local:8123"
+            - name: CLICKHOUSE_MIGRATION_URL
+              value: "clickhouse://langfuse-clickhouse.observe.svc.cluster.local:9000"
+            - name: CLICKHOUSE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-clickhouse-secret
+                  key: CLICKHOUSE_USER
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-clickhouse-secret
+                  key: CLICKHOUSE_PASSWORD
+            - name: REDIS_CONNECTION_STRING
+              value: "redis://langfuse-redis.observe.svc.cluster.local:6379"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_BUCKET
+              value: "langfuse-events"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_REGION
+              value: "auto"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT
+              value: "http://langfuse-minio.observe.svc.cluster.local:9000"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE
+              value: "true"
+            - name: LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_USER
+            - name: LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_PASSWORD
+            - name: LANGFUSE_S3_MEDIA_UPLOAD_BUCKET
+              value: "langfuse-media"
+            - name: LANGFUSE_S3_MEDIA_UPLOAD_REGION
+              value: "auto"
+            - name: LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT
+              value: "http://langfuse-minio.observe.svc.cluster.local:9000"
+            - name: LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE
+              value: "true"
+            - name: LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_USER
+            - name: LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-minio-secret
+                  key: MINIO_ROOT_PASSWORD
+            - name: ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: langfuse-secret
+                  key: ENCRYPTION_KEY
+            - name: TELEMETRY_ENABLED
+              value: "false"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "3Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-worker
+  namespace: observe
+spec:
+  selector:
+    app: langfuse-worker
+  ports:
+    - port: 3030
+      targetPort: 3030
+      name: http

@@ -1,0 +1,45 @@
+# dedicated to langfuse's own queue/cache -- no auth, no persistence (it's a
+# queue, losing it on a restart just means in-flight trace events get redone)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langfuse-redis
+  namespace: observe
+  labels:
+    app: langfuse-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langfuse-redis
+  template:
+    metadata:
+      labels:
+        app: langfuse-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:8.2
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: langfuse-redis
+  namespace: observe
+spec:
+  selector:
+    app: langfuse-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: redis
