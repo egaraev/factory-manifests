@@ -1,7 +1,18 @@
-# read-only access to the 4 namespaces this whole factory owns -- no write/delete
-# anywhere, and nothing at all in argocd/kube-system/platform. sre_agent.py runs
-# under this to read pod status/events directly (prometheus/loki cover metrics/logs,
-# this is for the stuff that only ever shows up as a k8s Event, e.g. OOMKilled)
+# broad read-only access across the 4 namespaces this factory owns, plus a
+# small cluster-scoped set for things that genuinely have no namespace (nodes,
+# PVs, storage classes, webhook configs, CSRs, ClusterRoles/Bindings).
+# sre_agent.py's investigation tools use this to inspect live cluster state
+# directly instead of only inferring it from log noise -- see KAN-65/66/67,
+# where fx-verify spent 3 rework rounds confused about whether a ClusterRole
+# diff was even real, because it could only read git + forbidden-error spam,
+# never the live object itself.
+#
+# still no write/delete anywhere, and nothing at all in argocd/kube-system/
+# platform. the one deliberate exception to "all possible info": never
+# secrets, in any namespace, any verb. a diagnostic agent that can read every
+# Secret in these namespaces defeats the entire least-privilege point this
+# pipeline exists to enforce -- exactly what fx-review has flagged as CONCERNS
+# every time a fix PR tried to grant it to a workload.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -15,13 +26,34 @@ metadata:
   namespace: ai-models
 rules:
   - apiGroups: [""]
-    resources: ["pods", "events", "services", "configmaps"]
+    resources: ["pods", "events", "services", "endpoints", "configmaps", "serviceaccounts", "limitranges", "resourcequotas", "replicationcontrollers"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
   - apiGroups: ["apps"]
-    resources: ["deployments", "replicasets", "daemonsets"]
+    resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -45,16 +77,34 @@ metadata:
   namespace: pipeline
 rules:
   - apiGroups: [""]
-    resources: ["pods", "events", "services", "configmaps"]
+    resources: ["pods", "events", "services", "endpoints", "configmaps", "serviceaccounts", "limitranges", "resourcequotas", "replicationcontrollers"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
   - apiGroups: ["apps"]
-    resources: ["deployments", "replicasets", "daemonsets"]
+    resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["batch"]
-    resources: ["jobs"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -78,13 +128,34 @@ metadata:
   namespace: sample-app
 rules:
   - apiGroups: [""]
-    resources: ["pods", "events", "services", "configmaps"]
+    resources: ["pods", "events", "services", "endpoints", "configmaps", "serviceaccounts", "limitranges", "resourcequotas", "replicationcontrollers"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
   - apiGroups: ["apps"]
-    resources: ["deployments", "replicasets", "daemonsets"]
+    resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -108,13 +179,34 @@ metadata:
   namespace: observe
 rules:
   - apiGroups: [""]
-    resources: ["pods", "events", "services", "configmaps"]
+    resources: ["pods", "events", "services", "endpoints", "configmaps", "serviceaccounts", "limitranges", "resourcequotas", "replicationcontrollers"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
   - apiGroups: ["apps"]
-    resources: ["deployments", "replicasets", "daemonsets"]
+    resources: ["deployments", "replicasets", "daemonsets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses", "networkpolicies"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
     verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -129,4 +221,40 @@ subjects:
 roleRef:
   kind: Role
   name: sre-agent-read
+  apiGroup: rbac.authorization.k8s.io
+---
+# cluster-scoped read -- only for kinds that genuinely have no namespace, so a
+# namespaced Role above can't grant them
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sre-agent-cluster-read
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "persistentvolumes", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles", "clusterrolebindings"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses", "volumeattachments"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["certificates.k8s.io"]
+    resources: ["certificatesigningrequests"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sre-agent-cluster-read
+subjects:
+  - kind: ServiceAccount
+    name: sre-agent
+    namespace: pipeline
+roleRef:
+  kind: ClusterRole
+  name: sre-agent-cluster-read
   apiGroup: rbac.authorization.k8s.io
