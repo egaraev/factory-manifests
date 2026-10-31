@@ -110,8 +110,38 @@ data:
             target_label: __metrics_path__
             replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
 
-      - job_name: kubernetes-pods
+      # kube-state-metrics exports kube_* metrics whose own namespace/pod/uid
+      # labels describe *other* pods. honor_labels must be set so its own
+      # labels win over the scrape target's, otherwise the kubernetes-pods job
+      # rewrites every kube_pod_status_phase's pod/namespace to point at
+      # kube-state-metrics itself and the PodNotReady alert fires on phantoms.
+      - job_name: kube-state-metrics
         honor_labels: true
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: kube-state-metrics
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
+
+      - job_name: kubernetes-pods
         kubernetes_sd_configs:
           - role: pod
         relabel_configs:
