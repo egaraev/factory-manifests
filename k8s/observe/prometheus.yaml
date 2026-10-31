@@ -58,6 +58,16 @@ data:
         static_configs:
           - targets: ["dcgm-exporter.observe.svc.cluster.local:9400"]
 
+      # litellm's /metrics sits behind the same master-key auth as every other
+      # endpoint -- general_settings.require_auth_for_metrics_endpoint: false
+      # (set in k8s/llm/litellm.yaml) did NOT exempt it in practice (confirmed:
+      # still 401s), so this scrapes with the master key as a bearer token
+      # instead, same as any other authenticated call to litellm
+      - job_name: litellm
+        bearer_token_file: /etc/prometheus/secrets/litellm/master_key
+        static_configs:
+          - targets: ["litellm.ai-models.svc.cluster.local:4000"]
+
       - job_name: kubelet
         scheme: https
         tls_config:
@@ -164,6 +174,9 @@ spec:
               mountPath: /etc/prometheus
             - name: data
               mountPath: /prometheus
+            - name: litellm-token
+              mountPath: /etc/prometheus/secrets/litellm
+              readOnly: true
           resources:
             requests:
               cpu: "200m"
@@ -178,6 +191,12 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: prometheus-data
+        # secrets can't be mounted across namespaces -- this is a same-value
+        # copy of litellm-secret's master_key, living in observe. see
+        # secrets/README.md for the copy command
+        - name: litellm-token
+          secret:
+            secretName: litellm-scrape-secret
 ---
 apiVersion: v1
 kind: Service

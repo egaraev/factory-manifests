@@ -111,6 +111,17 @@ kubectl create secret generic langfuse-minio-secret \
   --from-literal=MINIO_ROOT_PASSWORD="$(openssl rand -hex 16)"
 ```
 
+## litellm-scrape-secret (observe)
+
+Same value as `litellm-secret`'s `master_key` -- Prometheus needs it as a bearer token to get past litellm's own auth on `/metrics` (see the comment on the `litellm` job in `k8s/observe/prometheus.yaml`). Secrets can't be read across namespaces, so this is a copy, not a reference.
+
+```sh
+MASTER_KEY=$(kubectl get secret litellm-secret -n ai-models -o jsonpath='{.data.master_key}' | base64 -d)
+kubectl create secret generic litellm-scrape-secret \
+  --namespace observe \
+  --from-literal=master_key="$MASTER_KEY"
+```
+
 ## langfuse-litellm-secret (ai-models)
 
 Lets litellm send traces to langfuse (`success_callback: ["langfuse"]` in `k8s/llm/litellm.yaml`). These keys don't exist yet at first deploy -- create a project in the langfuse UI (`http://<aibox-lan-ip>:30350`, or `http://localhost:30350` from the aibox host itself) after its first login, then grab its API keys from Project Settings and run this. litellm's secretKeyRef for these is `optional: true`, so it runs fine without this secret -- tracing just silently does nothing until it exists and the litellm pod restarts.

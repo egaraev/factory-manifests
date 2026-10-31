@@ -44,7 +44,6 @@ data:
     general_settings:
       master_key: os.environ/LITELLM_MASTER_KEY
       allow_requests_on_db_unavailable: true
-      require_auth_for_metrics_endpoint: false  # prometheus scrapes /metrics with no auth header
 
     litellm_settings:
       drop_params: true
@@ -67,9 +66,6 @@ spec:
   template:
     metadata:
       labels: {app: litellm}
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "4000"
     spec:
       containers:
         - name: litellm
