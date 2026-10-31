@@ -4,8 +4,8 @@ metadata:
   name: factory-orchestrator
   namespace: pipeline
 spec:
-  # polls every 2 minutes -- update the epic key in the command below whenever
-  # you start a new epic; it walks that epic's tasks in order, one step per poll
+  # polls every 2 minutes -- walks every open epic (jira_client.get_epics), so
+  # a new epic just needs to exist in jira, nothing to update here anymore
   schedule: "*/2 * * * *"
   concurrencyPolicy: Forbid
   jobTemplate:
@@ -20,7 +20,7 @@ spec:
           containers:
             - name: orchestrator
               image: ghcr.io/egaraev/ai-software-factory:latest
-              command: ["python", "orchestrator.py", "KAN-24"]
+              command: ["python", "orchestrator.py"]
               envFrom:
                 - secretRef:
                     name: factory-pipeline-env
