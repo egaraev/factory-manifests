@@ -14,62 +14,12 @@ metadata:
 rules:
   - apiGroups: [""]
     resources:
-      - configmaps
-      - secrets
-      - nodes
       - pods
-      - services
-      - endpoints
-      - endpointslices
-      - namespaces
-      - persistentvolumeclaims
-      - persistentvolumes
-      - limitranges
-      - resourcequotas
-      - replicationcontrollers
-    verbs: ["list", "watch"]
-  - apiGroups: ["apps"]
-    resources:
-      - deployments
-      - replicasets
-      - daemonsets
-      - statefulsets
     verbs: ["list", "watch"]
   - apiGroups: ["batch"]
     resources:
       - jobs
       - cronjobs
-    verbs: ["list", "watch"]
-  - apiGroups: ["extensions", "networking.k8s.io"]
-    resources:
-      - ingresses
-      - networkpolicies
-    verbs: ["list", "watch"]
-  - apiGroups: ["policy"]
-    resources:
-      - poddisruptionbudgets
-    verbs: ["list", "watch"]
-  - apiGroups: ["storage.k8s.io"]
-    resources:
-      - storageclasses
-      - volumeattachments
-    verbs: ["list", "watch"]
-  - apiGroups: ["certificates.k8s.io"]
-    resources:
-      - certificatesigningrequests
-    verbs: ["list", "watch"]
-  - apiGroups: ["coordination.k8s.io"]
-    resources:
-      - leases
-    verbs: ["list", "watch"]
-  - apiGroups: ["autoscaling"]
-    resources:
-      - horizontalpodautoscalers
-    verbs: ["list", "watch"]
-  - apiGroups: ["admissionregistration.k8s.io"]
-    resources:
-      - mutatingwebhookconfigurations
-      - validatingwebhookconfigurations
     verbs: ["list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -109,6 +59,8 @@ spec:
       containers:
         - name: kube-state-metrics
           image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.19.1
+          args:
+            - "--resources=pods,jobs,cronjobs"
           ports:
             - containerPort: 8080
               name: http-metrics
