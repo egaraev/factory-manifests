@@ -32,7 +32,12 @@ data:
           stream_timeout: 60
       - model_name: fx-verify
         litellm_params:
-          model: openrouter/deepseek/deepseek-v3.2
+          # swapped from deepseek-v3.2 -- v3.2 kept acknowledging reviewer
+          # feedback in its own prose without actually putting the change in
+          # its file block (see KAN-65's 3 rework rounds), v4-pro-0813 scores
+          # noticeably higher on SWE-bench Verified and is still a fraction of
+          # fx-review/Sonnet's price. same vendor/family, easy to compare
+          model: openrouter/deepseek/deepseek-v4-pro-0813
           api_key: os.environ/OPENROUTER_API_KEY
           cache_control_injection_points: [...]
       - model_name: fx-review
