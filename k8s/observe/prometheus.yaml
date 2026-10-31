@@ -145,6 +145,14 @@ data:
         kubernetes_sd_configs:
           - role: pod
         relabel_configs:
+          # kube-state-metrics is scraped exclusively by its own dedicated job
+          # above (with honor_labels: true) -- without this drop, this job also
+          # scrapes it via its scrape annotation and produces a second, clobbered
+          # copy of its kube_pod_status_phase/etc metrics that still mislabels
+          # whatever pod it is reporting on as kube-state-metrics itself
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: drop
+            regex: kube-state-metrics
           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
             action: keep
             regex: true
