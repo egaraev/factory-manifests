@@ -76,6 +76,21 @@ data:
         static_configs:
           - targets: ["litellm.ai-models.svc.cluster.local:4000"]
 
+      # repo-scorecard (k8s/orchestrator/scorecard-cronjob.yaml) and any future
+      # batch job push their numbers here instead of exposing their own
+      # /metrics -- they're gone by the time a scrape would hit them.
+      # honor_labels: true keeps each push's own "job" label (e.g.
+      # "repo-scorecard") instead of Prometheus overwriting it with
+      # "pushgateway" and renaming the original to "exported_job" -- same
+      # fix as kube-state-metrics below, same reason. pushgateway's pod carries
+      # no prometheus.io/scrape annotation specifically so the kubernetes-pods
+      # job below doesn't ALSO pick it up and create a second, non-honor_labels
+      # copy of the same series
+      - job_name: pushgateway
+        honor_labels: true
+        static_configs:
+          - targets: ["pushgateway.observe.svc.cluster.local:9091"]
+
       - job_name: kubelet
         scheme: https
         tls_config:

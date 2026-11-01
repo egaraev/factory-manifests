@@ -1,10 +1,11 @@
 # holds the last pushed value from short-lived batch jobs prometheus can't
 # scrape directly -- it's gone by the time a scrape would hit it. the
 # repo-scorecard cronjob (k8s/orchestrator/scorecard-cronjob.yaml) pushes here
-# once per run. the pod annotation below is what gets it picked up: prometheus's
-# existing kubernetes-pods job already scrapes anything carrying
-# prometheus.io/scrape: "true" (same mechanism litellm's own /metrics uses, see
-# k8s/observe/prometheus.yaml) -- no scrape_configs edit needed here
+# once per run. scraped by its own dedicated "pushgateway" job in
+# k8s/observe/prometheus.yaml (honor_labels: true, same as kube-state-metrics)
+# -- deliberately NOT annotated prometheus.io/scrape here, so the generic
+# kubernetes-pods job doesn't ALSO pick it up and create a second,
+# non-honor_labels copy of the same series under job="kubernetes-pods"
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -21,9 +22,6 @@ spec:
     metadata:
       labels:
         app: pushgateway
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "9091"
     spec:
       containers:
         - name: pushgateway
