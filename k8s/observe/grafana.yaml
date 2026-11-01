@@ -348,6 +348,136 @@ data:
         }
       ]
     }
+  dora-metrics.json: |
+    {
+      "title": "DORA metrics",
+      "uid": "dora-metrics",
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "15m",
+      "time": { "from": "now-30d", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Deployment frequency",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [ { "expr": "increase(dora_deployments_total{job=\"dora-metrics\"}[7d])" } ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 1,
+              "displayName": "deploys / week",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "green", "value": 7 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "id": 2,
+          "title": "Lead time for changes",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [ { "expr": "dora_lead_time_seconds{job=\"dora-metrics\"} / 3600" } ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "h",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 24 },
+                  { "color": "red", "value": 168 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "id": 3,
+          "title": "Change failure rate",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [ { "expr": "increase(dora_incidents_total{job=\"dora-metrics\"}[7d]) / increase(dora_deployments_total{job=\"dora-metrics\"}[7d]) * 100" } ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 15 },
+                  { "color": "red", "value": 30 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "id": 4,
+          "title": "Mean time to restore",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [ { "expr": "dora_mttr_seconds{job=\"dora-metrics\"} / 3600" } ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "h",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "red", "value": 24 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "id": 5,
+          "title": "Deploys per day over time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [ { "expr": "increase(dora_deployments_total{job=\"dora-metrics\"}[1d])", "legendFormat": "deploys/day" } ],
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+        },
+        {
+          "id": 6,
+          "title": "Lead time & MTTR over time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [
+            { "expr": "dora_lead_time_seconds{job=\"dora-metrics\"} / 3600", "legendFormat": "lead time (h, avg last 10)" },
+            { "expr": "dora_mttr_seconds{job=\"dora-metrics\"} / 3600", "legendFormat": "mttr (h, avg last 10)" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "h" }, "overrides": [] }
+        }
+      ]
+    }
 ---
 apiVersion: apps/v1
 kind: Deployment

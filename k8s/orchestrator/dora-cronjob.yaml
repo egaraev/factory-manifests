@@ -1,0 +1,31 @@
+# computes deployment frequency, lead time for changes, change failure rate
+# and mttr from factory-manifests' own deploy-commit history and jira's "ops"
+# tickets, pushing them to the pushgateway in observe for grafana's "DORA
+# metrics" dashboard. same image/secret as factory-orchestrator and
+# repo-scorecard -- dora_metrics.py lives in the same ai-software-factory repo
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: dora-metrics
+  namespace: pipeline
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: ghcr-pull-secret
+          containers:
+            - name: dora-metrics
+              image: ghcr.io/egaraev/ai-software-factory:latest
+              command: ["python", "dora_metrics.py"]
+              envFrom:
+                - secretRef:
+                    name: factory-pipeline-env
+              env:
+                - name: PUSHGATEWAY_URL
+                  value: "http://pushgateway.observe.svc.cluster.local:9091"
