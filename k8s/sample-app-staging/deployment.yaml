@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: factory-sample-app
+  namespace: sample-app-staging
+  labels:
+    app: factory-sample-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: factory-sample-app
+  template:
+    metadata:
+      labels:
+        app: factory-sample-app
+    spec:
+      containers:
+        # same staged-delivery setup as k8s/sample-app/deployment.yaml -- ci's
+        # deploy-staging job pins this to a build's sha right after it passes
+        # the security scan, so this namespace always runs exactly the
+        # candidate that's about to be (eventually) smoke-tested, before
+        # production ever sees it
+        - name: factory-sample-app
+          image: ghcr.io/egaraev/factory-sample-app:7a1a84277faea71e6d761cfd5457b7449b42b5fb
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          # same readinessProbe as production -- not load-bearing for traffic
+          # here (nothing external points at staging), but the eventual
+          # smoke-test job wants the rollout itself to only report healthy
+          # once the app is actually answering, not just once the process starts
+          readinessProbe:
+            httpGet:
+              path: /hello
+              port: 8000
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  # ClusterIP, not NodePort -- staging only ever needs to be reachable from
+  # inside the cluster (the future smoke-test job curls this directly), no
+  # reason to expose it externally the way production's NodePort is
+  name: factory-sample-app-staging
+  namespace: sample-app-staging
+spec:
+  type: ClusterIP
+  selector:
+    app: factory-sample-app
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
