@@ -1,0 +1,31 @@
+# clones factory-sample-app's current main and runs free code-health tools
+# against it (coverage, ruff, radon, pip-audit), pushing the results to the
+# pushgateway in observe for grafana's "repo readiness" dashboard. reuses the
+# same image/secret as factory-orchestrator since scorecard.py lives in the
+# same ai-software-factory repo and only needs read access to the sample app
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: repo-scorecard
+  namespace: pipeline
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: ghcr-pull-secret
+          containers:
+            - name: scorecard
+              image: ghcr.io/egaraev/ai-software-factory:latest
+              command: ["python", "scorecard.py"]
+              envFrom:
+                - secretRef:
+                    name: factory-pipeline-env
+              env:
+                - name: PUSHGATEWAY_URL
+                  value: "http://pushgateway.observe.svc.cluster.local:9091"

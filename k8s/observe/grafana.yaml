@@ -224,6 +224,130 @@ data:
         }
       ]
     }
+  repo-scorecard.json: |
+    {
+      "title": "repo readiness",
+      "uid": "repo-scorecard",
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "5m",
+      "time": { "from": "now-7d", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Test coverage",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [ { "expr": "repo_scorecard_coverage_percent{job=\"repo-scorecard\"}" } ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "green", "value": 80 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "id": 2,
+          "title": "Lint errors (ruff)",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [ { "expr": "repo_scorecard_lint_errors{job=\"repo-scorecard\"}" } ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1 },
+                  { "color": "red", "value": 6 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "id": 3,
+          "title": "Avg complexity (radon)",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [ { "expr": "repo_scorecard_avg_complexity{job=\"repo-scorecard\"}" } ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 6 },
+                  { "color": "red", "value": 11 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "id": 4,
+          "title": "Dependency vulnerabilities",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [ { "expr": "repo_scorecard_vulnerabilities{job=\"repo-scorecard\"}" } ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } }
+        },
+        {
+          "id": 5,
+          "title": "Test coverage over time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [ { "expr": "repo_scorecard_coverage_percent{job=\"repo-scorecard\"}", "legendFormat": "coverage %" } ],
+          "fieldConfig": { "defaults": { "unit": "percent", "max": 100, "min": 0 }, "overrides": [] }
+        },
+        {
+          "id": 6,
+          "title": "Lint errors & complexity over time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [
+            { "expr": "repo_scorecard_lint_errors{job=\"repo-scorecard\"}", "legendFormat": "lint errors" },
+            { "expr": "repo_scorecard_avg_complexity{job=\"repo-scorecard\"}", "legendFormat": "avg complexity" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+        }
+      ]
+    }
 ---
 apiVersion: apps/v1
 kind: Deployment
