@@ -26,6 +26,19 @@ spec:
           ports:
             - containerPort: 8000
               name: http
+          # without this, k8s considers a pod "ready" the instant the container
+          # process starts -- which can be before uvicorn has actually finished
+          # booting. that's the gap a plain rolling update has today: the old
+          # pod could get killed before the new one can really serve anything.
+          # /hello is a real route (app/main.py) that touches no DB, so it's a
+          # clean "is the ASGI server actually up" signal, not a fake stub path
+          readinessProbe:
+            httpGet:
+              path: /hello
+              port: 8000
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
