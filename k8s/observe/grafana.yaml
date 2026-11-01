@@ -143,6 +143,87 @@ data:
         }
       ]
     }
+  qdrant.json: |
+    {
+      "title": "qdrant overview",
+      "uid": "qdrant-overview",
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "30s",
+      "time": { "from": "now-6h", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Collections & vectors",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [
+            { "expr": "collections_total", "legendFormat": "collections" },
+            { "expr": "collections_vector_total", "legendFormat": "vectors" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+        },
+        {
+          "id": 2,
+          "title": "Points per collection",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [
+            { "expr": "collection_points", "legendFormat": "{{id}}" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+        },
+        {
+          "id": 3,
+          "title": "CPU cores used",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [
+            { "expr": "cpu_cores_used", "legendFormat": "cores" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+        },
+        {
+          "id": 4,
+          "title": "Memory usage",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [
+            { "expr": "memory_resident_bytes", "legendFormat": "resident" },
+            { "expr": "memory_allocated_bytes", "legendFormat": "allocated" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] }
+        },
+        {
+          "id": 5,
+          "title": "Update queue length (ingest backpressure)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [
+            { "expr": "collection_update_queue_length", "legendFormat": "{{id}}" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+        },
+        {
+          "id": 6,
+          "title": "Open file descriptors",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "Prometheus" },
+          "targets": [
+            { "expr": "process_open_fds", "legendFormat": "open" },
+            { "expr": "process_max_fds", "legendFormat": "max" }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+        }
+      ]
+    }
 ---
 apiVersion: apps/v1
 kind: Deployment
