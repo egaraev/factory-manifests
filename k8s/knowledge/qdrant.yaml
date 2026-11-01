@@ -1,0 +1,105 @@
+# Qdrant for the factory's own standards/best-practices knowledge base --
+# a fresh, independent instance, not a reuse of the old aibox-platform Qdrant
+# (ai-memory namespace, obsidian_vault collection, on a cluster that's off
+# now). Same manifest shape as that one (it's a good template -- no auth,
+# PVC'd, plain REST), but new namespace, new PVC, new everything: nothing
+# here reads or writes the old vault/collection.
+#
+# Fed by factory-knowledge/ingest_vault.py (run from aibox's own shell, not
+# as an in-cluster Job -- this corpus is small and changes rarely, so a
+# one-off script hitting the NodePorts below is simpler than building and
+# maintaining a container image for it). Queried by the factory's own agents
+# via a new search_knowledge_base tool (knowledge_client.py in
+# ai-software-factory) over the in-cluster Service, same pattern as every
+# other direct-REST tool call in this project (Context7, Prometheus, Loki).
+#
+# Embedding model: nomic-embed-text-v1.5 (768-dim), via LiteLLM
+# (litellm.ai-models.svc.cluster.local:4000/embeddings) -- same model/route
+# already live on this cluster for other things, so collections here need
+# vector size 768, distance Cosine. Collection itself isn't created by this
+# manifest -- ingest_vault.py creates it on first upsert.
+#
+# No auth (QDRANT__SERVICE__API_KEY unset) -- matches this whole cluster's
+# trust posture (single-node homelab, no public ingress). Revisit if that
+# posture ever changes.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qdrant-data
+  namespace: knowledge
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qdrant
+  namespace: knowledge
+  labels:
+    app: qdrant
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: qdrant
+  template:
+    metadata:
+      labels:
+        app: qdrant
+    spec:
+      containers:
+        - name: qdrant
+          image: qdrant/qdrant:latest
+          ports:
+            - containerPort: 6333
+              name: http
+            - containerPort: 6334
+              name: grpc
+          volumeMounts:
+            - name: data
+              mountPath: /qdrant/storage
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: qdrant-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant
+  namespace: knowledge
+spec:
+  selector:
+    app: qdrant
+  ports:
+    - port: 6333
+      targetPort: 6333
+      name: http
+    - port: 6334
+      targetPort: 6334
+      name: grpc
+---
+# NodePort so ingest_vault.py (run from aibox's shell, outside the cluster)
+# and the Qdrant dashboard (:30634/dashboard) can reach it directly -- same
+# pattern as k8s/llm/nodeports.yaml. 30634 is free in this cluster (llm uses
+# 30400/30808); the old vault's Qdrant used 30633 but that's a different,
+# now-off cluster, so there's no actual collision either way.
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant-nodeport
+  namespace: knowledge
+spec:
+  type: NodePort
+  selector:
+    app: qdrant
+  ports:
+    - port: 6333
+      targetPort: 6333
+      nodePort: 30634
+      name: http

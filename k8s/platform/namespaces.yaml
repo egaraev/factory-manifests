@@ -25,3 +25,15 @@ metadata:
   name: observe
   labels:
     app.kubernetes.io/part-of: ai-software-factory
+---
+# standards/best-practices knowledge base (Qdrant) + its future search tool --
+# deliberately independent from the old aibox-platform vault/Qdrant (ai-memory
+# namespace, on a cluster that's off now): new vault, new collection, new
+# namespace, nothing shared with the old setup except the k8s manifest shape
+# it was copied from
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: knowledge
+  labels:
+    app.kubernetes.io/part-of: ai-software-factory
