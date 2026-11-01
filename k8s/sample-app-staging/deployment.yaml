@@ -22,7 +22,7 @@ spec:
         # candidate that's about to be (eventually) smoke-tested, before
         # production ever sees it
         - name: factory-sample-app
-          image: ghcr.io/egaraev/factory-sample-app:7a1a84277faea71e6d761cfd5457b7449b42b5fb
+          image: ghcr.io/egaraev/factory-sample-app:d7c090b5330c84f7072e898f6b713cbe788f0816
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
