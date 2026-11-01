@@ -21,7 +21,7 @@ spec:
         # instead of needing a manual kubectl rollout restart. IfNotPresent is correct
         # here since each tag is now a unique, immutable sha -- no reason to ever refetch one
         - name: factory-sample-app
-          image: ghcr.io/egaraev/factory-sample-app:79552e424c9abb419a60d943052d744dd4b57374
+          image: ghcr.io/egaraev/factory-sample-app:d7c090b5330c84f7072e898f6b713cbe788f0816
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
