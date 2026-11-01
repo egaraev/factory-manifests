@@ -45,6 +45,11 @@ data:
           model: openrouter/anthropic/claude-sonnet-5
           api_key: os.environ/OPENROUTER_API_KEY
           cache_control_injection_points: [...]
+      - model_name: nomic-embed-text-v1.5
+        litellm_params:
+          model: openai/nomic-embed-text-v1.5
+          api_base: http://llama-swap.ai-models.svc.cluster.local:8080/v1
+          api_key: "none"
 
     general_settings:
       master_key: os.environ/LITELLM_MASTER_KEY
