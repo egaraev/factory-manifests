@@ -51,6 +51,9 @@ spec:
     metadata:
       labels:
         app: qdrant
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "6333"
     spec:
       containers:
         - name: qdrant
