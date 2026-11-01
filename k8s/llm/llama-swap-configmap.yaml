@@ -54,3 +54,24 @@ data:
         env:
           - "CUDA_VISIBLE_DEVICES=GPU-832b5f69-26d2-3908-7838-831fc0b98a17"
         ttl: 300
+
+      # was in litellm's model_list (knowledge_client.py's embedding calls)
+      # since the knowledge base went in, but never actually had a route
+      # here -- litellm forwarded by model name "nomic-embed-text-v1.5",
+      # llama-swap had nothing to match it to ("no router for requested
+      # model"), so every embedding call failed silently. no --pooling or
+      # -c here on purpose: the GGUF carries the right pooling type and
+      # context size in its own metadata, and an explicit wrong guess here
+      # would override a correct baked-in default
+      nomic-embed-text-v1.5:
+        cmd: |
+          llama-server
+          -m /models/nomic-embed-text-v1.5/nomic-embed-text-v1.5.Q8_0.gguf
+          --port ${PORT}
+          --host 0.0.0.0
+          --embeddings
+          -ngl 99
+          -t 8
+        env:
+          - "CUDA_VISIBLE_DEVICES=GPU-832b5f69-26d2-3908-7838-831fc0b98a17"  # 5070 Ti, same as the others -- tiny (146MB) model, shares fine
+        ttl: 300

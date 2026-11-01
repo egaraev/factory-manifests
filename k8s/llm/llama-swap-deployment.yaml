@@ -28,9 +28,14 @@ spec:
             - name: NVIDIA_VISIBLE_DEVICES
               value: "all"
           volumeMounts:
+            # whole-directory mount, not subPath -- a subPath-mounted
+            # ConfigMap doesn't get kubelet's periodic refresh, so an updated
+            # config can silently never reach a running pod. same bug class
+            # (and same fix) found and applied to the Hermes llama-swap
+            # earlier this session, in the unrelated aibox-platform repo --
+            # this is a separate instance that had the identical issue
             - name: config
-              mountPath: /etc/llama-swap/config/config.yaml
-              subPath: config.yaml
+              mountPath: /etc/llama-swap/config/
             - name: models
               mountPath: /models
               readOnly: true
