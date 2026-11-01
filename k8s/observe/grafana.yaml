@@ -255,7 +255,7 @@ data:
             },
             "overrides": []
           },
-          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } }
+          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
         },
         {
           "id": 2,
@@ -278,7 +278,7 @@ data:
             },
             "overrides": []
           },
-          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } }
+          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
         },
         {
           "id": 3,
@@ -301,7 +301,7 @@ data:
             },
             "overrides": []
           },
-          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } }
+          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
         },
         {
           "id": 4,
@@ -323,7 +323,7 @@ data:
             },
             "overrides": []
           },
-          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"] } }
+          "options": { "graphMode": "none", "colorMode": "value", "textMode": "value", "reduceOptions": { "calcs": ["lastNotNull"] } }
         },
         {
           "id": 5,
