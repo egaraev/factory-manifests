@@ -59,10 +59,18 @@ data:
       # since the knowledge base went in, but never actually had a route
       # here -- litellm forwarded by model name "nomic-embed-text-v1.5",
       # llama-swap had nothing to match it to ("no router for requested
-      # model"), so every embedding call failed silently. no --pooling or
-      # -c here on purpose: the GGUF carries the right pooling type and
-      # context size in its own metadata, and an explicit wrong guess here
-      # would override a correct baked-in default
+      # model"), so every embedding call failed silently. --pooling still
+      # left out (GGUF's own metadata picks the right pooling type).
+      # -c/-b/-ub ARE set now though, after a real failure showed why they
+      # can't be left on llama.cpp's own defaults for this use case: a
+      # reviewer_agent call with a 637-token ticket+diff input got rejected
+      # with "input (637 tokens) is too large to process... current batch
+      # size: 512" -- an embedding/pooling pass needs its whole input in one
+      # physical batch (ubatch), unlike causal generation which can split
+      # across batches, so the default 512 ubatch silently caps every
+      # embedding call. knowledge_client.py bounds its query text to 2000
+      # chars, so 4096 tokens of context/batch is a comfortable margin even
+      # for dense code/diff text
       nomic-embed-text-v1.5:
         cmd: |
           llama-server
@@ -72,6 +80,7 @@ data:
           --embeddings
           -ngl 99
           -t 8
+          -c 4096 -b 4096 -ub 4096
         env:
           - "CUDA_VISIBLE_DEVICES=GPU-832b5f69-26d2-3908-7838-831fc0b98a17"  # 5070 Ti, same as the others -- tiny (146MB) model, shares fine
         ttl: 300
