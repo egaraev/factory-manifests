@@ -16,9 +16,13 @@ spec:
         app: factory-sample-app
     spec:
       containers:
+        # pinned to a real git sha, not :latest -- ci updates this line itself on every
+        # push to factory-sample-app's main, so a new build actually rolls the pod
+        # instead of needing a manual kubectl rollout restart. IfNotPresent is correct
+        # here since each tag is now a unique, immutable sha -- no reason to ever refetch one
         - name: factory-sample-app
-          image: ghcr.io/egaraev/factory-sample-app:latest
-          imagePullPolicy: Always
+          image: ghcr.io/egaraev/factory-sample-app:55680cf50ff18bd0f375e244bb5c2ee83eac47fb
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
               name: http
