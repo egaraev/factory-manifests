@@ -1,0 +1,28 @@
+# polls every 2 minutes for a staging build that's ahead of production and
+# passing its own health check, then promotes it. this is staged delivery's
+# last piece: ci's deploy-staging job no longer needs to push to production
+# directly (see ci.yml) -- this CronJob is now the only thing that ever
+# changes production's image line
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: promote-staging
+  namespace: pipeline
+spec:
+  schedule: "*/2 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      template:
+        spec:
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: ghcr-pull-secret
+          containers:
+            - name: promote-staging
+              image: ghcr.io/egaraev/ai-software-factory:latest
+              command: ["python", "promote_staging.py"]
+              envFrom:
+                - secretRef:
+                    name: factory-pipeline-env
